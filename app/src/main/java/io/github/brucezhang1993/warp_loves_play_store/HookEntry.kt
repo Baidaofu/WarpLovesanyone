@@ -10,26 +10,31 @@ import com.highcapable.yukihookapi.hook.xposed.proxy.IYukiHookXposedInit
 
 @InjectYukiHookWithXposed
 object HookEntry : IYukiHookXposedInit {
+
+    /** 内置的强制走 WARP 包名 */
+    private val builtinForceProxy = setOf(
+        "com.android.vending",
+        "com.google.android.youtube",
+        "com.google.android.apps.photos"
+    )
+
     override fun onInit() = configs {
-        isDebug = BuildConfig.DEBUG
+        isDebug = false
     }
 
     override fun onHook() = YukiHookAPI.encase {
         loadApp("com.cloudflare.onedotonedotonedotone") {
+            val userPrefs = prefs
             "android.net.VpnService\$Builder".toClass().method {
                 name = "addDisallowedApplication"
                 param(StringClass)
                 returnType = "android.net.VpnService\$Builder".toClass()
             }.hook {
                 before {
-                    val param1 = args().first().string();
-                    // 强制走 WARP 代理的应用（拦截其加入豁免名单）
-                    if (param1 in setOf(
-                            "com.android.vending",
-                            "com.google.android.youtube",
-                            "com.google.android.apps.photos"
-                        )
-                    ) {
+                    val param1 = args().first().string()
+                    // 用户通过 UI 面板添加的包名（跨进程读取模块 SharedPreferences）
+                    val userForceProxy = userPrefs.getStringSet("force_proxy_packages", emptySet())
+                    if (param1 in builtinForceProxy || param1 in userForceProxy) {
                         result = instanceOrNull
                         return@before
                     }

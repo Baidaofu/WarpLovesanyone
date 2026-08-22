@@ -12,6 +12,16 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WarpLovesPlayStore"
         tools:targetApi="31">
+        <!-- 设置为主界面：手动添加/移除强制走 WARP 代理的包名 -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
         <!-- 设置为 Xposed 模块 -->
         <meta-data
             android:name="xposedmodule"
