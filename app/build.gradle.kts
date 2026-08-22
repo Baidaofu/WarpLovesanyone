@@ -21,11 +21,12 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // 不配置签名：CI 产出未签名 APK，由使用者自行 apksigner 签名
         }
     }
     compileOptions {

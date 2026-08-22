@@ -5,17 +5,10 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# 模块自身的所有类（HookEntry / 生成的入口 / MainActivity）：
+# - HookEntry 由 assets/xposed_init 与 resources/META-INF/yukihookapi_init
+#   按类名字符串反射加载，必须保留原名
+-keep class io.github.baidaofu.warp_loves_anyone.** { *; }
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# xposed-api 为 compileOnly（运行时由 Xposed 框架提供），忽略缺失类警告
+-dontwarn de.robv.android.xposed.**
