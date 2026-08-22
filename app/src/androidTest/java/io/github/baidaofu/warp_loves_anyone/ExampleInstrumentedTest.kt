@@ -1,4 +1,4 @@
-package io.github.brucezhang1993.warp_loves_play_store
+package io.github.baidaofu.warp_loves_anyone
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("io.github.brucezhang1993.warp_loves_play_store", appContext.packageName)
+        assertEquals("io.github.baidaofu.warp_loves_anyone", appContext.packageName)
     }
 }

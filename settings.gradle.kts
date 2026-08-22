@@ -16,5 +16,5 @@ plugins {
     id("com.highcapable.sweetdependency") version "1.0.4"
 }
 
-rootProject.name = "Warp Loves PlayStore"
+rootProject.name = "Warp Loves Anyone"
 include(":app")

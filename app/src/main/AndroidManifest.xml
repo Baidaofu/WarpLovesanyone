@@ -10,7 +10,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.WarpLovesPlayStore"
+        android:theme="@style/Theme.WarpLovesAnyone"
         tools:targetApi="31">
         <!-- 设置为主界面：手动添加/移除强制走 WARP 代理的包名 -->
         <activity

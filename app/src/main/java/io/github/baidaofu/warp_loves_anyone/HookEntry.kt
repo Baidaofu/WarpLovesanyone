@@ -1,4 +1,4 @@
-package io.github.brucezhang1993.warp_loves_play_store
+package io.github.baidaofu.warp_loves_anyone
 
 import com.highcapable.yukihookapi.YukiHookAPI
 import com.highcapable.yukihookapi.annotation.xposed.InjectYukiHookWithXposed

@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "io.github.brucezhang1993.warp_loves_play_store"
+    namespace = "io.github.baidaofu.warp_loves_anyone"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.brucezhang1993.warp_loves_play_store"
+        applicationId = "io.github.baidaofu.warp_loves_anyone"
         minSdk = 27
         targetSdk = 35
         versionCode = 3

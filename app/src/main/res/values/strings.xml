@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Warp Loves PlayStore</string>
-    <string name="description">Let Warp app works better with PlayStore</string>
+    <string name="app_name">Warp Loves Anyone</string>
+    <string name="description">Manually force any app to use WARP tunnel</string>
 </resources>
