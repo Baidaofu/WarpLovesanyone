@@ -14,13 +14,13 @@ import com.highcapable.yukihookapi.hook.factory.prefs
 
 class MainActivity : Activity() {
 
-    private val packageList = mutableSetOf<String>()
+    private val userPackages = mutableSetOf<String>()
     private lateinit var adapter: ArrayAdapter<String>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        packageList.addAll(prefs().getStringSet("force_proxy_packages", emptySet()))
+        userPackages.addAll(prefs().getStringSet("force_proxy_packages", emptySet()))
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -33,14 +33,24 @@ class MainActivity : Activity() {
         })
 
         root.addView(TextView(this).apply {
-            text = "在此添加的包名将强制走 WARP 代理（即使 WARP 默认将其排除）。" +
-                "修改后请断开并重新连接 WARP 以生效。点击列表项可移除。"
+            text = "内置强制代理（始终生效）："
+            textSize = 14f
+            setPadding(0, 16, 0, 4)
+        })
+
+        root.addView(TextView(this).apply {
+            text = "com.android.vending\ncom.google.android.youtube\ncom.google.android.apps.photos"
             textSize = 13f
-            setPadding(0, 16, 0, 32)
+        })
+
+        root.addView(TextView(this).apply {
+            text = "自定义包名（点击列表项移除）："
+            textSize = 14f
+            setPadding(0, 16, 0, 4)
         })
 
         val input = EditText(this).apply {
-            hint = "例如 com.google.android.youtube"
+            hint = "例如 com.google.android.apps.gmail"
             setSingleLine(true)
         }
         root.addView(
@@ -52,10 +62,11 @@ class MainActivity : Activity() {
         root.addView(
             addButton,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                .apply { topMargin = 24 }
+                .apply { topMargin = 16 }
         )
 
-        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, packageList.toList())
+        // 关键：传入 ArrayList（可变列表），否则 ArrayAdapter.clear() 会抛只读异常
+        adapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, ArrayList(userPackages))
         val listView = ListView(this).apply { adapter = this@MainActivity.adapter }
         root.addView(
             listView,
@@ -63,18 +74,17 @@ class MainActivity : Activity() {
         )
 
         listView.setOnItemClickListener { _, _, position, _ ->
-            adapter.getItem(position)?.let { pkg ->
-                packageList.remove(pkg)
-                saveAndRefresh()
-                Toast.makeText(this, "已移除 $pkg（需重连 WARP 生效）", Toast.LENGTH_SHORT).show()
-            }
+            val pkg = adapter.getItem(position) ?: return@setOnItemClickListener
+            userPackages.remove(pkg)
+            saveAndRefresh()
+            Toast.makeText(this, "已移除 $pkg（需重连 WARP 生效）", Toast.LENGTH_SHORT).show()
         }
 
         addButton.setOnClickListener {
             val pkg = input.text.toString().trim()
             when {
                 pkg.isEmpty() -> Toast.makeText(this, "请输入包名", Toast.LENGTH_SHORT).show()
-                packageList.add(pkg) -> {
+                userPackages.add(pkg) -> {
                     saveAndRefresh()
                     input.text.clear()
                     Toast.makeText(this, "已添加 $pkg", Toast.LENGTH_SHORT).show()
@@ -87,9 +97,9 @@ class MainActivity : Activity() {
     }
 
     private fun saveAndRefresh() {
-        prefs().putStringSet("force_proxy_packages", packageList)
+        prefs().putStringSet("force_proxy_packages", userPackages)
         adapter.clear()
-        adapter.addAll(packageList)
+        adapter.addAll(userPackages)
         adapter.notifyDataSetChanged()
     }
 }
