@@ -57,6 +57,10 @@ plugins:
 #     gson:
 #       version: +
 libraries:
+  # YukiHookAPI KSP 生成的代码使用 @Keep 注解，必须提供 androidx.annotation
+  androidx.annotation:
+    annotation:
+      version: 1.8.2
   # 作为 Xposed 模块使用务必添加，其它情况可选
   de.robv.android.xposed:
     api:

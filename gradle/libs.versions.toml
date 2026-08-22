@@ -9,6 +9,7 @@ appcompat = "1.6.1"
 material = "1.10.0"
 
 [libraries]
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version = "1.8.2" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }

@@ -42,6 +42,8 @@ android {
 }
 
 dependencies {
+    // YukiHookAPI KSP 生成代码依赖 @Keep 注解
+    implementation(libs.androidx.annotation)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
