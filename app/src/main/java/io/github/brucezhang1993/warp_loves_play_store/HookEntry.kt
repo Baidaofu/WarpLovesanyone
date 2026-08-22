@@ -23,7 +23,13 @@ object HookEntry : IYukiHookXposedInit {
             }.hook {
                 before {
                     val param1 = args().first().string();
-                    if ("com.android.vending" == param1) {
+                    // 强制走 WARP 代理的应用（拦截其加入豁免名单）
+                    if (param1 in setOf(
+                            "com.android.vending",
+                            "com.google.android.youtube",
+                            "com.google.android.apps.photos"
+                        )
+                    ) {
                         result = instanceOrNull
                         return@before
                     }
