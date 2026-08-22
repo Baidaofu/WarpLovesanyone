@@ -33,20 +33,10 @@ class MainActivity : Activity() {
         })
 
         root.addView(TextView(this).apply {
-            text = "内置强制代理（始终生效）："
-            textSize = 14f
-            setPadding(0, 16, 0, 4)
-        })
-
-        root.addView(TextView(this).apply {
-            text = "com.android.vending\ncom.google.android.youtube\ncom.google.android.apps.photos"
+            text = "在此添加需要强制走 WARP 代理的应用包名（如 com.google.android.youtube）。" +
+                "修改后请断开并重新连接 WARP 以生效。点击列表项可移除。"
             textSize = 13f
-        })
-
-        root.addView(TextView(this).apply {
-            text = "自定义包名（点击列表项移除）："
-            textSize = 14f
-            setPadding(0, 16, 0, 4)
+            setPadding(0, 16, 0, 32)
         })
 
         val input = EditText(this).apply {

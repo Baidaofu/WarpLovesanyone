@@ -11,13 +11,6 @@ import com.highcapable.yukihookapi.hook.xposed.proxy.IYukiHookXposedInit
 @InjectYukiHookWithXposed
 object HookEntry : IYukiHookXposedInit {
 
-    /** 内置的强制走 WARP 包名 */
-    private val builtinForceProxy = setOf(
-        "com.android.vending",
-        "com.google.android.youtube",
-        "com.google.android.apps.photos"
-    )
-
     override fun onInit() = configs {
         isDebug = false
     }
@@ -32,9 +25,9 @@ object HookEntry : IYukiHookXposedInit {
             }.hook {
                 before {
                     val param1 = args().first().string()
-                    // 用户通过 UI 面板添加的包名（跨进程读取模块 SharedPreferences）
+                    // 仅用户通过面板手动添加的包名（跨进程读取模块 SharedPreferences）
                     val userForceProxy = userPrefs.getStringSet("force_proxy_packages", emptySet())
-                    if (param1 in builtinForceProxy || param1 in userForceProxy) {
+                    if (param1 in userForceProxy) {
                         result = instanceOrNull
                         return@before
                     }
