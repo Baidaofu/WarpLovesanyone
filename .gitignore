@@ -47,3 +47,7 @@ google-services.json
 *.hprof
 
 app/release/
+
+# IDE / build tooling junk
+.idea/
+.kotlin/
