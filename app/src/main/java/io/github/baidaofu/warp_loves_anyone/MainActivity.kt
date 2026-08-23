@@ -24,11 +24,15 @@ class MainActivity : Activity() {
     /** dp 转 px，适配不同屏幕密度 */
     private fun Int.dp(): Int = (this * resources.displayMetrics.density).toInt()
 
-    /** 取当前主题下的颜色属性（亮/暗色自动适配） */
-    private fun themeColor(attr: Int): Int {
+    /** 取当前主题下的颜色状态列表（亮/暗色自动适配） */
+    private fun themeColorStateList(attr: Int): android.content.res.ColorStateList {
         val value = TypedValue()
-        theme.resolveAttribute(attr, value, true)
-        return value.data
+        if (theme.resolveAttribute(attr, value, true)) {
+            // 资源引用 → 读 ColorStateList；直接值 → 包装成单色
+            return if (value.resourceId != 0) getColorStateList(value.resourceId)
+            else android.content.res.ColorStateList.valueOf(value.data)
+        }
+        return android.content.res.ColorStateList.valueOf(0xFF808080.toInt())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,7 +70,7 @@ class MainActivity : Activity() {
             text = "在此添加需要强制走 WARP 代理的应用包名（如 com.google.android.youtube）。" +
                 "修改后请断开并重新连接 WARP 以生效。点击列表项可移除。"
             textSize = 13f
-            setTextColor(themeColor(android.R.attr.textColorSecondary))
+            setTextColor(themeColorStateList(android.R.attr.textColorSecondary))
             setPadding(0, 8.dp(), 0, 16.dp())
         })
 
