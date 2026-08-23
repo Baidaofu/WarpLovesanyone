@@ -1,4 +1,4 @@
 <resources>
-    <!-- 纯框架主题（不使用 Material/AppCompat 依赖） -->
+    <!-- 深色主题：系统处于暗色模式时自动启用 -->
     <style name="Theme.WarpLovesAnyone" parent="android:Theme.Material.NoActionBar" />
 </resources>
