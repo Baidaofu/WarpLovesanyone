@@ -1,16 +1,17 @@
 package io.github.baidaofu.warp_loves_anyone
 
 import android.app.Activity
+import android.os.Build
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ListView
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import com.highcapable.yukihookapi.hook.factory.prefs
@@ -37,21 +38,31 @@ class MainActivity : Activity() {
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16.dp(), 16.dp(), 16.dp(), 16.dp())
+        }
+        // Android 15+ 强制 edge-to-edge：必须手动让出系统栏（状态栏/导航栏），否则内容会被遮挡
+        val basePadding = 16.dp()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            root.setOnApplyWindowInsetsListener { view, insets ->
+                val bars = insets.getInsets(WindowInsets.Type.systemBars())
+                view.setPadding(
+                    bars.left + basePadding,
+                    bars.top + basePadding,
+                    bars.right + basePadding,
+                    bars.bottom + basePadding
+                )
+                WindowInsets.CONSUMED
+            }
+        } else {
+            root.setPadding(basePadding, basePadding, basePadding, basePadding)
         }
 
-        // 表单区：包在 ScrollView 里，任何屏幕尺寸/字体缩放下都不会被裁掉
-        val form = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        form.addView(TextView(this).apply {
+        root.addView(TextView(this).apply {
             text = "WARP 强制代理应用"
             textSize = 20f
             typeface = android.graphics.Typeface.DEFAULT_BOLD
         })
 
-        form.addView(TextView(this).apply {
+        root.addView(TextView(this).apply {
             text = "在此添加需要强制走 WARP 代理的应用包名（如 com.google.android.youtube）。" +
                 "修改后请断开并重新连接 WARP 以生效。点击列表项可移除。"
             textSize = 13f
@@ -63,26 +74,16 @@ class MainActivity : Activity() {
             hint = "例如 com.google.android.apps.gmail"
             setSingleLine(true)
         }
-        form.addView(
+        root.addView(
             input,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         )
 
         val addButton = Button(this).apply { text = "添加包名" }
-        form.addView(
+        root.addView(
             addButton,
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 .apply { topMargin = 16.dp() }
-        )
-
-        val formScroll = ScrollView(this).apply {
-            // 权重 1：占满除列表外的空间，内容超高时内部滚动
-            isFillViewport = true
-        }
-        formScroll.addView(form)
-        root.addView(
-            formScroll,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f }
         )
 
         // 关键：传入 ArrayList（可变列表），否则 ArrayAdapter.clear() 会抛只读异常
@@ -90,9 +91,10 @@ class MainActivity : Activity() {
         val listView = ListView(this).apply {
             adapter = this@MainActivity.adapter
         }
+        // 列表紧贴按钮下方，占满剩余空间（无空白间隔）
         root.addView(
             listView,
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 280.dp())
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0).apply { weight = 1f }
         )
 
         listView.setOnItemClickListener { _, _, position, _ ->
