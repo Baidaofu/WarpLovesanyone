@@ -12,8 +12,6 @@ The 1.1.1.1 app adds some packages to its VPN "disallowed applications" list (e.
 - Supports both Cloudflare VPN clients: **1.1.1.1** (`com.cloudflare.onedotonedotonedotone`) and **Cloudflare One Agent** (`com.cloudflare.cloudflareoneagent`)
 - GitHub Actions builds an **unsigned, minified release APK** automatically on push
 
-> Note: WireGuard is intentionally **not** supported — it routes all apps by default and has no server-side forced exclusion list, so there is nothing to intercept.
-
 ## Usage
 
 1. Install the module APK and enable it in LSPosed
