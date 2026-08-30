@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "io.github.baidaofu.warp_loves_anyone"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.baidaofu.warp_loves_anyone"
@@ -43,9 +43,10 @@ dependencies {
     // libxposed API 签名中引用 androidx 注解，需要提供
     implementation(libs.androidx.annotation)
     // libxposed API 102：运行时由 Xposed 框架提供，必须 compileOnly
-    compileOnly(libs.libxposed.api)
+    // （SweetDependency 依赖直接以 组名.库名 访问，不走 libs catalog）
+    compileOnly(io.github.libxposed.api)
     // libxposed Service：模块 app 侧经 XposedService 读写框架远程偏好（Remote Preferences）
-    implementation(libs.libxposed.service)
+    implementation(io.github.libxposed.service)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

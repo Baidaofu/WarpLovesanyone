@@ -20,8 +20,13 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x gradlew
+      - name: Install Android SDK Platform 37
+        run: |
+          cd "$ANDROID_HOME/platforms"
+          curl -sL -o /tmp/platform-37.2.zip https://dl.google.com/android/repository/platform-37.2_r01.zip
+          unzip -q /tmp/platform-37.2.zip -d /tmp/p37
+          cp -r /tmp/p37/android-37.2 android-37
+          sed -i 's/\${PLATFORM_VERSION}/17/g; s/^AndroidVersion.ApiLevel=.*/AndroidVersion.ApiLevel=37/' android-37/source.properties
 
       - name: Build release APK (unsigned)
         run: |
