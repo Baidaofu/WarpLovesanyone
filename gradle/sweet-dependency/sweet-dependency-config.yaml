@@ -19,11 +19,6 @@ repositories:
     scope: PLUGINS
   google:
   maven-central:
-  # 作为 Xposed 模块使用务必添加，其它情况可选
-  rovo89-xposed-api:
-    url: https://api.xposed.info/
-  jitpack:
-    url: https://jitpack.io/
 
 # Configure plugins that need to be used
 # For example:
@@ -37,9 +32,6 @@ repositories:
 #   org.jetbrains.kotlin.jvm:
 #     version: +
 plugins:
-  # 作为 Xposed 模块使用务必添加，其它情况可选
-  com.google.devtools.ksp:
-    version: 2.0.20-1.0.25
   org.jetbrains.kotlin.android:
     version: 2.0.20
 
@@ -57,19 +49,15 @@ plugins:
 #     gson:
 #       version: +
 libraries:
-  # YukiHookAPI KSP 生成的代码使用 @Keep 注解，必须提供 androidx.annotation
+  # libxposed API 签名中引用了 androidx 注解，需要提供
   androidx.annotation:
     annotation:
       version: 1.8.2
-  # 作为 Xposed 模块使用务必添加，其它情况可选
-  de.robv.android.xposed:
+  # libxposed API 102（模块入口 / Hook API）
+  # 作为 compileOnly 依赖，运行时由支持 libxposed 的框架提供
+  io.github.libxposed:
     api:
-      version: 82
-      repositories:
-        rovo89-xposed-api
-  com.highcapable.yukihookapi:
-    api:
-      version: 1.2.1
-    # 作为 Xposed 模块使用务必添加，其它情况可选
-    ksp-xposed:
-      version-ref: <this>::api
+      version: 102.0.0
+    # libxposed Service（模块 app 侧写入框架远程偏好 Remote Preferences）
+    service:
+      version: 102.0.0

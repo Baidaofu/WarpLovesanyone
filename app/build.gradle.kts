@@ -1,8 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    // 作为 Xposed 模块使用务必添加，其它情况可选
-    autowire(libs.plugins.com.google.devtools.ksp)
 }
 
 android {
@@ -13,8 +11,8 @@ android {
         applicationId = "io.github.baidaofu.warp_loves_anyone"
         minSdk = 27
         targetSdk = 35
-        versionCode = 6
-        versionName = "2.4"
+        versionCode = 7
+        versionName = "2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -42,15 +40,13 @@ android {
 }
 
 dependencies {
-    // YukiHookAPI KSP 生成代码依赖 @Keep 注解
+    // libxposed API 签名中引用 androidx 注解，需要提供
     implementation(libs.androidx.annotation)
+    // libxposed API 102：运行时由 Xposed 框架提供，必须 compileOnly
+    compileOnly(libs.libxposed.api)
+    // libxposed Service：模块 app 侧经 XposedService 读写框架远程偏好（Remote Preferences）
+    implementation(libs.libxposed.service)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
-    // 基础依赖
-    implementation(com.highcapable.yukihookapi.api)
-    // 作为 Xposed 模块使用务必添加，其它情况可选
-    compileOnly(de.robv.android.xposed.api)
-    // 作为 Xposed 模块使用务必添加，其它情况可选
-    ksp(com.highcapable.yukihookapi.ksp.xposed)
 }
