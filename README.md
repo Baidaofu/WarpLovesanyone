@@ -1,41 +1,33 @@
 # Warp Loves Anyone
 
-An Xposed module (based on **libxposed API 102**) that forces **any app you choose** through the Cloudflare 1.1.1.1 (WARP) VPN tunnel.
+[中文](README.zh-CN.md)
 
-The 1.1.1.1 app adds some packages to its VPN "disallowed applications" list (e.g. Play Store), so their traffic bypasses WARP. This module hooks `VpnService.Builder.addDisallowedApplication` and blocks the packages you select from being added, making their traffic go through WARP.
+An Xposed module (libxposed API 102) that forces apps of your choice through the Cloudflare WARP tunnel, and makes the Cloudflare apps' dark mode follow the system setting.
 
 ## Features
 
-- **UI panel** (launcher icon) to manually add/remove package names
-- No built-in package list — only the packages you add are forced through WARP
-- Migrated to **libxposed API 102** (`META-INF/xposed/module.prop` + `java_init.list` + `scope.list`, interceptor-chain hook model, hook ids, hot reload support)
-- Configuration is stored in the framework's Remote Preferences (`getRemotePreferences`) instead of the deprecated New XSharedPreferences — this also clears the deprecation warning shown on the module page for legacy modules (New XSharedPreferences is scheduled for removal in 2.3.0)
-- **Dark mode of the Cloudflare apps now follows the system setting** (the apps' built-in toggle is overridden by the module on behalf of the system)
-- Existing package lists are migrated automatically (pushed to Remote Preferences) on first launch of the module app
-- Supports both Cloudflare VPN clients: **1.1.1.1** (`com.cloudflare.onedotonedotonedotone`) and **Cloudflare One Agent** (`com.cloudflare.cloudflareoneagent`)
-- GitHub Actions builds an **unsigned, minified release APK** automatically on push
+- Force any package through WARP: blocks selected packages from being added to the VPN's disallowed applications list (`VpnService.Builder.addDisallowedApplication`)
+- Dark mode of 1.1.1.1 / Cloudflare One Agent follows the system setting; the in-app toggle is managed by the system
+- UI panel to manage the package list, stored in the framework's Remote Preferences
+- Scope: `com.cloudflare.onedotonedotonedotone`, `com.cloudflare.cloudflareoneagent`
 
 ## Requirements
 
-- A libxposed-compatible framework implementing **API 102** (e.g. LSPosed 2.x+)
+- A libxposed-compatible framework with API 102 support (e.g. LSPosed 2.x+)
 
 ## Usage
 
-1. Install the module APK and enable it in your Xposed framework (scope is static: the two Cloudflare VPN apps)
-2. Open the **Warp Loves Anyone** app from the launcher
-3. Add the package names you want to force through WARP (e.g. `com.android.vending`)
-4. Reconnect the VPN (disconnect and connect) to apply
-
-> Note: when upgrading from v2.4 (YukiHookAPI-based), open the module app once so the old package list gets migrated to Remote Preferences.
+1. Enable the module in LSPosed (scope is fixed to the two Cloudflare apps)
+2. Open the app and add package names to force through WARP (e.g. `com.android.vending`)
+3. Reconnect the VPN to apply
 
 ## Build
 
 ```bash
 ./gradlew assembleRelease
-# 未签名 APK: app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-CI 产出的 APK 未签名，安装前需要自行签名（例如使用 Android SDK 的 apksigner）：
+CI produces an unsigned APK; sign it before installing, e.g.:
 
 ```bash
 apksigner sign --ks debug.keystore --ks-pass pass:android --key-pass pass:android \
