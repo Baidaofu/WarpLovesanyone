@@ -6,9 +6,9 @@
 
 ## 功能
 
-- 强制任意包名走 WARP：拦截 `VpnService.Builder.addDisallowedApplication`，阻止所选包名进入 VPN 的「排除应用」列表
-- 1.1.1.1 / Cloudflare One Agent 的暗色模式跟随系统设置，App 内开关由系统代管
-- 界面管理包名列表，配置存于框架 Remote Preferences
+- 强制任意包名走 WARP：阻止所选包名进入 VPN 的「排除应用」列表
+- 在 App 的 设置 → 高级 → 连接选项 内注入「强制代理列表」入口
+- 在 设置 → 高级 内注入「跟随系统主题」开关；开启后 App 的深色主题由系统代管
 - 作用域：`com.cloudflare.onedotonedotonedotone`、`com.cloudflare.cloudflareoneagent`
 
 ## 要求
@@ -18,8 +18,8 @@
 ## 使用
 
 1. 在 LSPosed 中启用模块（作用域固定为上述两个 App）
-2. 打开模块界面，添加要强制走 WARP 的包名（如 `com.android.vending`）
-3. 断开并重连 VPN 生效
+2. 在 App 内管理强制代理列表：设置 → 高级 → 连接选项
+3. 修改列表后断开并重连 VPN 生效
 
 ## 构建
 

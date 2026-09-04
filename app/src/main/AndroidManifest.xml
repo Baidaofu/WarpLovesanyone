@@ -13,24 +13,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WarpLovesAnyone"
         tools:targetApi="31">
-        <!-- 设置为主界面：手动添加/移除强制走 WARP 代理的包名 -->
-        <activity
-            android:name=".MainActivity"
-            android:exported="true"
-            android:theme="@style/Theme.WarpLovesAnyone"
-            android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
         <!--
-            本模块已迁移至 libxposed API 102，不再声明任何 legacy Xposed meta-data
-            （xposedmodule / xposedscope / xposeddescription / xposedminversion / xposedsharedprefs）。
-            模块元数据改为由 META-INF/xposed/ 下的 module.prop、scope.list、java_init.list 提供，
-            模块名称与描述读取 android:label 与 android:description。
-            同时移除 xposedsharedprefs（New XSharedPreferences 计划于 2.3.0 移除），
-            以消除模块页面针对 legacy 模块的废弃警告。
+            无独立界面：功能入口注入在 Cloudflare App 的设置页内
+            （连接选项页的"强制代理列表"行 + 高级设置"跟随系统主题"开关）。
+            模块元数据由 META-INF/xposed/ 下的 module.prop、scope.list、java_init.list 提供。
         -->
     </application>
 </manifest>

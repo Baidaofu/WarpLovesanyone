@@ -58,6 +58,3 @@ libraries:
   io.github.libxposed:
     api:
       version: 102.0.0
-    # libxposed Service（模块 app 侧写入框架远程偏好 Remote Preferences）
-    service:
-      version: 102.0.0

@@ -1,7 +1,4 @@
 <resources>
     <string name="app_name">Warp Loves Anyone</string>
-    <string name="description">Manually force any app to use WARP tunnel</string>
-    <string name="status_waiting">未检测到 Xposed 框架服务，修改仅保存在本地</string>
-    <string name="status_connected">已连接 %1$s，修改将同步到框架</string>
-    <string name="status_no_remote">Xposed 框架不支持远程配置，修改仅保存在本地</string>
+    <string name="description">Force WARP proxy &amp; system dark mode for Cloudflare apps</string>
 </resources>

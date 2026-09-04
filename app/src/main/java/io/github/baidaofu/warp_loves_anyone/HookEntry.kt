@@ -1,6 +1,8 @@
 package io.github.baidaofu.warp_loves_anyone
 
-import android.content.SharedPreferences
+import android.app.Application
+import android.app.Instrumentation
+import android.content.Context
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.util.Log
@@ -16,31 +18,25 @@ import java.lang.reflect.Modifier
 /**
  * libxposed API 102 模块入口。
  *
- * 功能一（强制 WARP 代理）：在 WARP 客户端进程内拦截
- * [android.net.VpnService.Builder.addDisallowedApplication]，阻止用户手动添加的
- * 包名被加入 VPN 的"排除应用"列表，使其流量继续走 WARP 隧道。
+ * 功能一（强制 WARP 代理）：拦截 [android.net.VpnService.Builder.addDisallowedApplication]，
+ * 阻止用户在"连接选项"里配置的强制代理包名进入 VPN 排除列表。
+ * 配置存于目标 App 私有的 SharedPreferences（文件 "warp_loves_anyone"），
+ * 由注入到 App 设置页里的界面读写（单进程 App，读写即时可见）。
  *
- * 功能二（暗色模式跟随系统）：Cloudflare 两个 App（1.1.1.1 / One Agent）自带暗色开关
- * 但从不跟随系统设置。其内部实现为：App.onCreate 读取 SharedPreferences 键
- * "dark_mode"（布尔，位于 `<包名>_preferences`），再调用
- * `AppCompatDelegate.setDefaultNightMode(1/2)`（混淆后为唯一的 static void (int)）。
- * 本模块做三件事：
- *  1. contains("dark_mode") 恒真 —— 用户从未动过开关时 App 会读默认值 false 强制浅色；
- *  2. getBoolean("dark_mode") 返回系统当前深色状态（Resources.getSystem().uiMode）；
- *  3. setDefaultNightMode 被调用时强制改为 MODE_NIGHT_FOLLOW_SYSTEM，
- *     让 AppCompat 原生跟随系统（含运行中实时切换），App 内开关由此由系统代管。
- *
- * 配置读取采用框架远程偏好（Remote Preferences）：模块 UI 侧经 libxposed Service 写入，
- * 本类在目标进程内经 [getRemotePreferences] 只读读取。
+ * 功能二（暗色模式跟随系统）：可由注入的"跟随系统主题"开关控制（默认开启）：
+ *  - contains/getBoolean("dark_mode") 按系统状态应答；
+ *  - setDefaultNightMode 强制 MODE_NIGHT_FOLLOW_SYSTEM，AppCompat 原生跟随系统；
+ *  - 开关关闭时不干预，App 自带的手动深色开关恢复生效。
  */
 class HookEntry : XposedModule() {
 
     companion object {
         private const val TAG = "WarpLovesAnyone"
 
-        /** 远程偏好分组名，需与 MainActivity 保持一致 */
-        const val PREFS_GROUP = "config"
+        /** 目标 App 私有配置文件（注入 UI 与 Hook 共用，单进程） */
+        const val CONFIG_PREFS = "warp_loves_anyone"
         const val KEY_FORCE_PROXY_PACKAGES = "force_proxy_packages"
+        const val KEY_FOLLOW_SYSTEM_THEME = "follow_system_theme"
 
         /** Cloudflare App 内暗色模式开关的 SharedPreferences 键 */
         private const val KEY_APP_DARK_MODE = "dark_mode"
@@ -52,6 +48,7 @@ class HookEntry : XposedModule() {
         private const val DARK_MODE_CONTAINS_HOOK_ID = "dark_mode_contains"
         private const val DARK_MODE_READ_HOOK_ID = "dark_mode_read"
         private const val DARK_MODE_APPLY_HOOK_ID = "dark_mode_apply"
+        private const val CONTEXT_HOOK_ID = "app_context"
 
         /** 需要挂载的 App（Cloudflare VPN 客户端）
          *
@@ -64,8 +61,8 @@ class HookEntry : XposedModule() {
         )
     }
 
-    /** 各目标包的 classloader，热重载后重装钩子用（App 类加载器对象允许跨代持有） */
     private val packageClassLoaders = HashMap<String, ClassLoader>()
+    private val nightModeMethods = HashMap<String, Method>()
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         log(
@@ -73,23 +70,33 @@ class HookEntry : XposedModule() {
             "loaded into ${param.processName} " +
                 "(${frameworkName} $frameworkVersion, API $apiVersion)"
         )
-        if ((frameworkProperties and XposedInterface.PROP_CAP_REMOTE) == 0L) {
-            log(Log.WARN, TAG, "framework lacks remote preference support, configuration unavailable")
-        }
     }
 
     override fun onPackageReady(param: PackageReadyParam) {
         if (param.packageName !in targetPackages) return
-        if ((frameworkProperties and XposedInterface.PROP_CAP_REMOTE) == 0L) {
-            log(Log.ERROR, TAG, "cannot read configuration: remote preferences unsupported")
-            return
-        }
         packageClassLoaders[param.packageName] = param.classLoader
+        installContextHook()
         installVpnHook(param.packageName, param.classLoader)
         installDarkModeFollowSystemHooks(param.packageName, param.classLoader)
+        AppUiInjector.install(this, param.packageName, param.classLoader)
     }
 
-    /** 功能一：拦截 addDisallowedApplication，阻断用户强制代理名单进 VPN 排除列表 */
+    /** 捕获 Application 上下文，供 Hook 与注入 UI 读写 App 私有配置 */
+    private fun installContextHook() {
+        try {
+            val m = Instrumentation::class.java.getDeclaredMethod(
+                "callApplicationOnCreate", Application::class.java
+            )
+            hook(m).setId(CONTEXT_HOOK_ID).intercept { chain ->
+                (chain.getArg(0) as? Application)?.let { AppUiInjector.appContext = it }
+                chain.proceed()
+            }
+        } catch (t: Throwable) {
+            log(Log.WARN, TAG, "failed to hook app context capture", t)
+        }
+    }
+
+    /** 功能一：拦截 addDisallowedApplication，阻断强制代理名单进 VPN 排除列表 */
     private fun installVpnHook(packageName: String, classLoader: ClassLoader) {
         try {
             val builderClass =
@@ -98,38 +105,54 @@ class HookEntry : XposedModule() {
                 builderClass.getDeclaredMethod("addDisallowedApplication", String::class.java)
             hook(target)
                 .setId(VPN_HOOK_ID)
-                .intercept(forceProxyHooker(getRemotePreferences(PREFS_GROUP)))
+                .intercept { chain ->
+                    val pkg = chain.getArg(0) as? String
+                    val forceProxy = AppUiInjector.forceProxyPackages().orEmpty()
+                    if (pkg != null && pkg in forceProxy) {
+                        chain.thisObject // 原方法语义为 return this，保持链式调用兼容
+                    } else {
+                        chain.proceed()
+                    }
+                }
             log(Log.INFO, TAG, "hooked addDisallowedApplication in $packageName")
         } catch (t: Throwable) {
             log(Log.ERROR, TAG, "failed to hook addDisallowedApplication in $packageName", t)
         }
     }
 
-    /** 功能二：让 App 暗色模式跟随系统 */
+    /** 功能二：暗色模式跟随系统（受"跟随系统主题"开关控制） */
     private fun installDarkModeFollowSystemHooks(packageName: String, classLoader: ClassLoader) {
         // 1) contains("dark_mode") 恒真：App 的 PreferencesDelegate 读值前先查 contains，
-        //    键不存在时直接用默认值 false 强制浅色，因此必须放行到读取路径
+        //    键不存在时直接用默认值 false 强制浅色，因此跟随模式下必须放行到读取路径
         try {
             val spi = Class.forName("android.app.SharedPreferencesImpl", false, classLoader)
             val contains = spi.getDeclaredMethod("contains", String::class.java)
             hook(contains)
                 .setId(DARK_MODE_CONTAINS_HOOK_ID)
                 .intercept { chain ->
-                    if (chain.getArg(0) == KEY_APP_DARK_MODE) true else chain.proceed()
+                    if (chain.getArg(0) == KEY_APP_DARK_MODE && AppUiInjector.followSystemTheme()) {
+                        true
+                    } else {
+                        chain.proceed()
+                    }
                 }
             log(Log.INFO, TAG, "hooked SharedPreferences.contains in $packageName")
         } catch (t: Throwable) {
             log(Log.WARN, TAG, "failed to hook SharedPreferences.contains in $packageName", t)
         }
 
-        // 2) 读取替换：dark_mode 的读值 = 系统当前深色状态
+        // 2) 读取替换：跟随模式下 dark_mode 的读值 = 系统当前深色状态
         try {
             val spi = Class.forName("android.app.SharedPreferencesImpl", false, classLoader)
             val getBoolean = spi.getDeclaredMethod("getBoolean", String::class.java, java.lang.Boolean.TYPE)
             hook(getBoolean)
                 .setId(DARK_MODE_READ_HOOK_ID)
                 .intercept { chain ->
-                    if (chain.getArg(0) == KEY_APP_DARK_MODE) isSystemDarkMode() else chain.proceed()
+                    if (chain.getArg(0) == KEY_APP_DARK_MODE && AppUiInjector.followSystemTheme()) {
+                        isSystemDarkMode()
+                    } else {
+                        chain.proceed()
+                    }
                 }
             log(Log.INFO, TAG, "hooked dark mode reads in $packageName")
         } catch (t: Throwable) {
@@ -137,7 +160,7 @@ class HookEntry : XposedModule() {
         }
 
         // 3) 应用替换：setDefaultNightMode（名称被混淆，运行期按"唯一 static void (int)"签名解析）
-        //    强制传 MODE_NIGHT_FOLLOW_SYSTEM，交给 AppCompat 原生跟随系统
+        //    跟随模式下强制 MODE_NIGHT_FOLLOW_SYSTEM，交给 AppCompat 原生跟随系统
         try {
             val delegate =
                 Class.forName("androidx.appcompat.app.AppCompatDelegate", false, classLoader)
@@ -153,11 +176,15 @@ class HookEntry : XposedModule() {
                 return
             }
             val apply = candidates[0]
+            nightModeMethods[packageName] = apply
             hook(apply)
                 .setId(DARK_MODE_APPLY_HOOK_ID)
                 .intercept { chain ->
-                    log(Log.INFO, TAG, "night mode request ${chain.getArg(0)} -> FOLLOW_SYSTEM")
-                    chain.proceed(arrayOf(MODE_NIGHT_FOLLOW_SYSTEM))
+                    if (AppUiInjector.followSystemTheme()) {
+                        chain.proceed(arrayOf(MODE_NIGHT_FOLLOW_SYSTEM))
+                    } else {
+                        chain.proceed()
+                    }
                 }
             log(Log.INFO, TAG, "hooked night mode apply (${apply.name}) in $packageName")
         } catch (t: Throwable) {
@@ -166,23 +193,10 @@ class HookEntry : XposedModule() {
     }
 
     /** 系统当前是否为深色模式 */
-    private fun isSystemDarkMode(): Boolean {
+    fun isSystemDarkMode(): Boolean {
         val uiMode = Resources.getSystem().getConfiguration().uiMode
         return (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
     }
-
-    /**
-     * addDisallowedApplication 拦截器：
-     * 包名在用户强制代理列表中 → 跳过原方法直接返回 Builder 本身
-     * （原方法语义为 return this，保持链式调用兼容），该包即不会被加入排除列表；
-     * 否则继续原始调用链。
-     */
-    private fun forceProxyHooker(prefs: SharedPreferences): XposedInterface.Hooker =
-        XposedInterface.Hooker { chain ->
-            val pkg = chain.getArg(0) as? String
-            val forceProxy = prefs.getStringSet(KEY_FORCE_PROXY_PACKAGES, emptySet()).orEmpty()
-            if (pkg != null && pkg in forceProxy) chain.thisObject else chain.proceed()
-        }
 
     override fun onHotReloading(param: HotReloadingParam): Boolean {
         // 本模块无自有线程 / 原生钩子，无需清理，直接允许热重载
@@ -195,9 +209,12 @@ class HookEntry : XposedModule() {
         param.oldHookHandles.forEach { it.unhook() }
         val loaders = HashMap(packageClassLoaders)
         packageClassLoaders.clear()
+        nightModeMethods.clear()
         loaders.forEach { (pkg, loader) ->
+            installContextHook()
             installVpnHook(pkg, loader)
             installDarkModeFollowSystemHooks(pkg, loader)
+            AppUiInjector.install(this, pkg, loader)
         }
         log(Log.INFO, TAG, "onHotReloaded, re-installed hooks for ${loaders.size} package(s)")
     }
