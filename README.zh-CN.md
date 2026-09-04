@@ -7,7 +7,7 @@
 ## 功能
 
 - 强制任意包名走 WARP：阻止所选包名进入 VPN 的「排除应用」列表
-- 在 App 的 设置 → 高级 → 连接选项 内注入「强制代理列表」入口
+- 在 App 的 设置 → 高级 → 连接选项 内注入「强制代理列表」入口（原生风格列表 + 图标多选选择器）
 - 在 设置 → 高级 内注入「跟随系统主题」开关；开启后 App 的深色主题由系统代管
 - 作用域：`com.cloudflare.onedotonedotonedotone`、`com.cloudflare.cloudflareoneagent`
 

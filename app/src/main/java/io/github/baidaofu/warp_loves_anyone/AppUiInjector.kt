@@ -6,19 +6,20 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Configuration
 import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.os.Bundle
-import android.text.TextUtils
 import android.util.Log
 import android.util.TypedValue
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
+import android.widget.BaseAdapter
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.Switch
 import android.widget.TextView
-import android.widget.Toast
 import io.github.libxposed.api.XposedInterface
 import java.util.Locale
 
@@ -26,9 +27,14 @@ import java.util.Locale
  * 注入到 Cloudflare App 设置界面的 UI 与相关读写逻辑。
  *
  * - ConnectionOptionsActivity（设置-高级-连接选项）："管理被排除的应用"行下方注入
- *   "强制代理列表"行，点击弹出编辑对话框（增删包名）。
+ *   "强制代理列表"行；点击进入列表页（复用原生行布局：图标 + 名称 + ✕ 移除），
+ *   页内"管理"按钮打开原生样式的应用多选选择器（图标 + 复选框，保存生效）。
  * - SettingsActivity（设置-高级）："使用深色主题"行下方注入"跟随系统主题"开关；
- *   开启后 App 自带的深色开关失效（置灰、显示系统状态）。
+ *   开启后 App 自带的深色开关置灰失效、显示系统状态，主题由系统代管。
+ *
+ * 注入复用的全部是目标 App 自带资源：layout_disabled_app_user_blocked_header /
+ * layout_disabled_app / layout_disabled_app_no_items / layout_exclude_application_entry /
+ * fragment_dialog_applications_list / CloudflareAlertDialogStyle。
  *
  * 配置统一存于目标 App 私有 SharedPreferences（[HookEntry.CONFIG_PREFS]），
  * 本注入 UI 与 HookEntry 的 Hook 同进程读写，即时生效。
@@ -106,13 +112,11 @@ object AppUiInjector {
         context.getSharedPreferences(HookEntry.CONFIG_PREFS, Context.MODE_PRIVATE)
 
     fun forceProxyPackages(): Set<String>? = currentContext()?.let {
-        it.getSharedPreferences(HookEntry.CONFIG_PREFS, Context.MODE_PRIVATE)
-            .getStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, null)
+        configPrefs(it).getStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, null)
     }
 
     fun followSystemTheme(): Boolean = currentContext()?.let {
-        it.getSharedPreferences(HookEntry.CONFIG_PREFS, Context.MODE_PRIVATE)
-            .getBoolean(HookEntry.KEY_FOLLOW_SYSTEM_THEME, true)
+        configPrefs(it).getBoolean(HookEntry.KEY_FOLLOW_SYSTEM_THEME, true)
     } ?: true
 
     private fun setFollowSystemTheme(context: Context, value: Boolean) {
@@ -121,9 +125,12 @@ object AppUiInjector {
 
     private fun saveForceProxyPackages(context: Context, packages: Set<String>) {
         configPrefs(context).edit()
-            .putStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, packages.toSet())
+            .putStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, packages)
             .apply()
     }
+
+    private fun currentForceList(activity: Activity): Set<String> =
+        configPrefs(activity).getStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, null) ?: emptySet()
 
     private fun isSystemDarkMode(): Boolean {
         val uiMode = android.content.res.Resources.getSystem().getConfiguration().uiMode
@@ -175,7 +182,7 @@ object AppUiInjector {
             module?.log(Log.WARN, TAG, "clone native row failed, fallback to manual", t)
         }
 
-        // 兕底：克隆失败时手工构建
+        // 兜底：克隆失败时手工构建
         var theSwitch = rowSwitch
         if (row == null) {
             val titleSrc = res.getIdentifier("useDarkThemeTv", "id", activity.packageName)
@@ -233,7 +240,7 @@ object AppUiInjector {
         }
     }
 
-    /** 同步 App 自带"使用深色主题"开关的可用状态与显示 */
+    /** 同步 App 自带"使用深色主题"开关：跟随模式下置灰失效、显示系统状态 */
     private fun syncDarkSwitch(activity: Activity) {
         val res = activity.resources
         val switchId = res.getIdentifier("darkModeSwitch", "id", activity.packageName)
@@ -241,9 +248,11 @@ object AppUiInjector {
         val sw = activity.findViewById<Switch>(switchId) ?: return
         if (followSystemTheme()) {
             sw.isEnabled = false
+            sw.alpha = 0.4f
             sw.isChecked = isSystemDarkMode()
         } else {
             sw.isEnabled = true
+            sw.alpha = 1f
             sw.isChecked = rawAppDarkMode(activity) ?: false
         }
     }
@@ -287,7 +296,7 @@ object AppUiInjector {
         }
     }
 
-    // ---------- 连接选项页："强制代理列表" 行 + 编辑对话框 ----------
+    // ---------- 连接选项页："强制代理列表" 行 ----------
 
     private fun injectConnectionScreen(activity: Activity) {
         migrateRemoteConfigIfNeeded()
@@ -307,7 +316,7 @@ object AppUiInjector {
             copyTextStyle(excludeBtn, this)
             isClickable = true
             isFocusable = true
-            setOnClickListener { showForceProxyDialog(activity) }
+            setOnClickListener { showForceProxyListDialog(activity) }
         }
         val sep = View(activity).apply { background = separator.background }
 
@@ -315,51 +324,160 @@ object AppUiInjector {
         parent.addView(sep, idx + 3, copyLp(separator.layoutParams))
     }
 
-    private fun showForceProxyDialog(activity: Activity) {
-        val prefs = configPrefs(activity)
-        val items = ArrayList(
-            (prefs.getStringSet(HookEntry.KEY_FORCE_PROXY_PACKAGES, null) ?: emptySet()).sorted()
-        )
+    // ---------- 强制代理列表页（照抄原生"管理被排除的应用"布局与交互） ----------
 
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(16.dp(activity), 8.dp(activity), 16.dp(activity), 0)
-        }
-        val input = EditText(activity).apply {
-            hint = if (zh()) "包名，如 com.android.vending" else "Package name, e.g. com.android.vending"
-            setSingleLine(true)
-        }
-        val adapter = ArrayAdapter(activity, android.R.layout.simple_list_item_1, items)
-        val list = ListView(activity)
-        list.adapter = adapter
-        list.setOnItemClickListener { _, _, position, _ ->
-            val removed = adapter.getItem(position)
-            adapter.remove(removed)
-            saveForceProxyPackages(activity, items.toSet())
-        }
-        root.addView(input, ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        root.addView(
-            list,
-            ViewGroup.LayoutParams.MATCH_PARENT, 320.dp(activity)
-        )
+    private class AppEntry(val pkg: String, val label: String, val icon: Drawable)
 
-        AlertDialog.Builder(activity)
+    private fun showForceProxyListDialog(activity: Activity) {
+        val res = activity.resources
+        val pkgName = activity.packageName
+        fun layoutId(name: String) = res.getIdentifier(name, "layout", pkgName)
+        fun id(name: String) = res.getIdentifier(name, "id", pkgName)
+        val pm = activity.packageManager
+
+        fun loadEntries(): ArrayList<AppEntry> = ArrayList(
+            currentForceList(activity).sorted().map { pkg ->
+                val info = runCatching { pm.getApplicationInfo(pkg, 0) }.getOrNull()
+                AppEntry(
+                    pkg,
+                    info?.loadLabel(pm)?.toString() ?: pkg,
+                    info?.loadIcon(pm) ?: res.getDrawable(android.R.drawable.sym_def_app_icon, activity.theme)
+                )
+            }
+        )
+        val entries = loadEntries()
+
+        val root = LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL }
+
+        // 头部：复用原生 layout_disabled_app_user_blocked_header（"您已排除的应用 + 管理 ⚙"）
+        val header = activity.layoutInflater.inflate(
+            layoutId("layout_disabled_app_user_blocked_header"), root, false
+        ) as ViewGroup
+        var headerTitle: TextView? = null
+        collectViews(header) { if (it is TextView && headerTitle == null) headerTitle = it }
+        headerTitle?.text = if (zh()) "已强制代理的应用" else "Force proxied apps"
+        root.addView(header)
+
+        val emptyView = activity.layoutInflater.inflate(
+            layoutId("layout_disabled_app_no_items"), root, false
+        )
+        root.addView(emptyView)
+
+        fun renderRows() {
+            while (root.childCount > 2) root.removeViewAt(root.childCount - 1)
+            if (entries.isEmpty()) {
+                emptyView.visibility = View.VISIBLE
+                return
+            }
+            emptyView.visibility = View.GONE
+            entries.forEach { entry ->
+                val row = activity.layoutInflater.inflate(
+                    layoutId("layout_disabled_app"), root, false
+                ) as ViewGroup
+                row.findViewById<ImageView>(id("applicationIcon")).setImageDrawable(entry.icon)
+                row.findViewById<TextView>(id("applicationLabel")).text = entry.label
+                row.findViewById<View>(id("applicationRemoveBtn")).setOnClickListener {
+                    entries.remove(entry)
+                    saveForceProxyPackages(activity, entries.map { it.pkg }.toSet())
+                    renderRows()
+                }
+                root.addView(row)
+            }
+        }
+
+        header.findViewById<View>(id("manageBlockedApps"))?.setOnClickListener {
+            showAppPickerDialog(activity) {
+                entries.clear()
+                entries.addAll(loadEntries())
+                renderRows()
+            }
+        }
+        renderRows()
+
+        val dialog = AlertDialog.Builder(
+            activity, res.getIdentifier("CloudflareAlertDialogStyle", "style", pkgName)
+        )
             .setTitle(if (zh()) "强制代理列表" else "Force proxy list")
             .setView(root)
-            .setPositiveButton(if (zh()) "添加" else "Add") { _, _ ->
-                val pkg = input.text.toString().trim()
-                when {
-                    pkg.isEmpty() -> {}
-                    items.contains(pkg) ->
-                        Toast.makeText(activity, if (zh()) "该包名已在列表中" else "Already in list", Toast.LENGTH_SHORT).show()
-                    else -> {
-                        adapter.add(pkg)
-                        saveForceProxyPackages(activity, items.toSet())
-                    }
-                }
+            .setNegativeButton(if (zh()) "完成" else "Done", null)
+            .create()
+        dialog.show()
+        dialog.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            (activity.resources.displayMetrics.heightPixels * 0.8).toInt()
+        )
+    }
+
+    /** 应用选择器（照抄 ApplicationsListDialogFragment：原生对话框 + 图标 + 多选复选框 + 保存/取消） */
+    private fun showAppPickerDialog(activity: Activity, onSaved: () -> Unit) {
+        val res = activity.resources
+        val pkgName = activity.packageName
+        fun layoutId(name: String) = res.getIdentifier(name, "layout", pkgName)
+        fun id(name: String) = res.getIdentifier(name, "id", pkgName)
+        val pm = activity.packageManager
+
+        val selected = currentForceList(activity).toMutableSet()
+        val apps = pm.getInstalledApplications(0)
+            .filter {
+                pm.getLaunchIntentForPackage(it.packageName) != null &&
+                    !it.packageName.startsWith("com.cloudflare.")
             }
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
+            .map { AppEntry(it.packageName, it.loadLabel(pm).toString(), it.loadIcon(pm)) }
+            .sortedBy { it.label.lowercase() }
+
+        // 照抄 fragment_dialog_applications_list（FrameLayout{RecyclerView, ProgressBar}）：
+        // RecyclerView 需要 androidx 依赖，替换为外观一致的 ListView
+        val root = activity.layoutInflater.inflate(layoutId("fragment_dialog_applications_list"), null, false) as ViewGroup
+        val recycler = root.findViewById<View>(id("applicationsRecyclerView"))
+        val recyclerIndex = root.indexOfChild(recycler)
+        val recyclerLp = recycler.layoutParams
+        root.removeView(recycler)
+        val list = ListView(activity)
+        root.addView(list, recyclerIndex, recyclerLp)
+        root.findViewById<View>(id("progressBar"))?.visibility = View.GONE
+
+        list.adapter = object : BaseAdapter() {
+            override fun getCount(): Int = apps.size
+            override fun getItem(position: Int): AppEntry = apps[position]
+            override fun getItemId(position: Int): Long = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val entry = getItem(position)
+                val row = (convertView as? ViewGroup)
+                    ?: activity.layoutInflater.inflate(layoutId("layout_exclude_application_entry"), parent, false) as ViewGroup
+                row.findViewById<ImageView>(id("applicationIcon")).setImageDrawable(entry.icon)
+                row.findViewById<TextView>(id("applicationLabel")).text = entry.label
+                val checkbox = row.findViewById<CheckBox>(id("applicationCheckbox"))
+                checkbox.setOnCheckedChangeListener(null)
+                checkbox.isChecked = entry.pkg in selected
+                checkbox.setOnCheckedChangeListener { _, checked ->
+                    if (checked) selected.add(entry.pkg) else selected.remove(entry.pkg)
+                }
+                return row
+            }
+        }
+        list.setOnItemClickListener { _, _, position, _ ->
+            val entry = apps[position]
+            val checkState = entry.pkg in selected
+            if (checkState) selected.remove(entry.pkg) else selected.add(entry.pkg)
+            (list.adapter as BaseAdapter).notifyDataSetChanged()
+        }
+
+        val dialog = AlertDialog.Builder(
+            activity, res.getIdentifier("CloudflareAlertDialogStyle", "style", pkgName)
+        )
+            .setTitle(if (zh()) "选择应用" else "Select apps")
+            .setView(root)
+            .setNegativeButton(if (zh()) "取消" else "Cancel", null)
+            .setPositiveButton(if (zh()) "保存" else "Save") { _, _ ->
+                saveForceProxyPackages(activity, selected)
+                onSaved()
+            }
+            .create()
+        dialog.show()
+        dialog.window?.setLayout(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            (activity.resources.displayMetrics.heightPixels * 0.85).toInt()
+        )
     }
 
     // ---------- 样式克隆 ----------

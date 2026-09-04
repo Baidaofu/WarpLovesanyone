@@ -7,7 +7,7 @@ An Xposed module (libxposed API 102) that forces apps of your choice through the
 ## Features
 
 - Force any package through WARP: blocks selected packages from being added to the VPN's disallowed applications list
-- "Force proxy list" entry injected into the apps' Settings → Advanced → Connection options
+- "Force proxy list" entry injected into the apps' Settings → Advanced → Connection options (native-style list with per-app remove, plus a multi-select app picker with icons)
 - "Follow system theme" switch injected into Settings → Advanced; when on, the apps' dark theme toggle is managed by the system
 - Scope: `com.cloudflare.onedotonedotonedotone`, `com.cloudflare.cloudflareoneagent`
 
