@@ -9,7 +9,8 @@ The 1.1.1.1 app adds some packages to its VPN "disallowed applications" list (e.
 - **UI panel** (launcher icon) to manually add/remove package names
 - No built-in package list — only the packages you add are forced through WARP
 - Migrated to **libxposed API 102** (`META-INF/xposed/module.prop` + `java_init.list` + `scope.list`, interceptor-chain hook model, hook ids, hot reload support)
-- Configuration is stored in the framework's **Remote Preferences** (`getRemotePreferences`) instead of the deprecated New XSharedPreferences — this also clears the deprecation warning shown on the module page for legacy modules (New XSharedPreferences is scheduled for removal in 2.3.0)
+- Configuration is stored in the framework's Remote Preferences (`getRemotePreferences`) instead of the deprecated New XSharedPreferences — this also clears the deprecation warning shown on the module page for legacy modules (New XSharedPreferences is scheduled for removal in 2.3.0)
+- **Dark mode of the Cloudflare apps now follows the system setting** (the apps' built-in toggle is overridden by the module on behalf of the system)
 - Existing package lists are migrated automatically (pushed to Remote Preferences) on first launch of the module app
 - Supports both Cloudflare VPN clients: **1.1.1.1** (`com.cloudflare.onedotonedotonedotone`) and **Cloudflare One Agent** (`com.cloudflare.cloudflareoneagent`)
 - GitHub Actions builds an **unsigned, minified release APK** automatically on push
